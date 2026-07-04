@@ -165,6 +165,13 @@
     font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--gold);
     margin:8px 0 2px;opacity:.85;
   }
+  .export-btn{
+    width:100%;margin:6px 0 2px;padding:7px 0;background:none;color:var(--paper-dim);
+    border:1px dashed var(--hairline);border-radius:3px;font-family:var(--mono);
+    font-size:10px;letter-spacing:.22em;cursor:pointer;transition:color .15s,border-color .15s;
+  }
+  .export-btn:hover{color:var(--gold);border-color:var(--gold-soft);}
+  .export-btn:focus-visible{outline:1.5px solid var(--gold);outline-offset:2px;}
   @media (max-width:720px){
     .trip-toggle{left:12px;bottom:14px;}
     .trip-dock{left:12px;bottom:62px;width:auto;right:12px;}
@@ -218,6 +225,7 @@
   <ul class="stops" id="stops"></ul>
   <button class="overview-btn" id="overviewBtn" type="button">回到全景 · OVERVIEW</button>
   <p class="atlas-foot" id="footStats"></p>
+  <button class="export-btn" id="exportBtn" type="button">导出足迹卡 · PNG</button>
 </aside>
 
 <div class="trip-dock" id="tripDock">
@@ -230,6 +238,9 @@
   </div>
   <p class="trip-presets-head">经典路线 · 一键巡游</p>
   <div class="trip-presets" id="tripPresets"></div>
+  <div class="trip-btns" style="margin-top:10px;">
+    <button id="luckyBtn" type="button">🎲 下一站去哪</button>
+  </div>
 </div>
 <button class="trip-toggle" id="tripToggle" type="button">行程<b id="tripCount">0</b></button>
 
@@ -1445,12 +1456,13 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
   function unitVisibleInProvince(u, prov) {
     return MUNI[prov] ? (u.type === 'spot' && u.p === prov) : (u.type === 'city' && u.p === prov);
   }
+  var spotlightIdx = -1; /* 抽签抽中的临时聚焦站点（本不在当前视图也强制可见） */
   function setMarkersForMode() {
     UNITS.forEach(function (c, i) {
-      /* 全国视图：旗舰 + 行程中的站点都常显，让自定义路线在全景可见 */
+      /* 全国视图：旗舰 + 行程站点常显；抽签聚焦站点任何模式都可见 */
       markers[i].visible = (mode === 'country')
-        ? ((c.type === 'spot' && !!c.flag) || routeSet.has(unitKey(c)))
-        : unitVisibleInProvince(c, currentProv);
+        ? ((c.type === 'spot' && !!c.flag) || routeSet.has(unitKey(c)) || i === spotlightIdx)
+        : (unitVisibleInProvince(c, currentProv) || i === spotlightIdx);
       if (mode === 'country') applyOffset(i, 0, 0);
     });
     if (mode === 'province') {
@@ -1775,6 +1787,7 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     activeIdx = -1;
     for (var k in listItemByIdx) listItemByIdx[k].classList.remove('active');
     popup.classList.remove('open');
+    if (spotlightIdx >= 0) { spotlightIdx = -1; setMarkersForMode(); }
   }
   document.getElementById('popupClose').addEventListener('click', closePopup);
   document.getElementById('overviewBtn').addEventListener('click', exitToCountry);
@@ -1939,6 +1952,106 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
       box.appendChild(b);
     });
   })();
+
+  /* 🎲 下一站抽签：从未打卡的景点里随机抽一处并飞过去 */
+  document.getElementById('luckyBtn').addEventListener('click', function () {
+    stopTour();
+    var candidates = [];
+    UNITS.forEach(function (u, i) {
+      if (u.type === 'spot' && !checkins.has(unitKey(u))) candidates.push(i);
+    });
+    if (!candidates.length) return;
+    var idx = candidates[Math.floor(Math.random() * candidates.length)];
+    spotlightIdx = idx;
+    setMarkersForMode();
+    openSpotCard(idx, true);
+    lastActive = performance.now();
+  });
+
+  /* 导出足迹卡：canvas 手绘迷你版图（点亮省份填金）+ 统计，下载 PNG */
+  document.getElementById('exportBtn').addEventListener('click', function () {
+    var W = 1080, H = 1440;
+    var c = document.createElement('canvas'); c.width = W; c.height = H;
+    var x = c.getContext('2d');
+    var grad = x.createRadialGradient(W / 2, H * 0.4, 80, W / 2, H * 0.4, 950);
+    grad.addColorStop(0, '#161f3c'); grad.addColorStop(1, '#0a0f1d');
+    x.fillStyle = grad; x.fillRect(0, 0, W, H);
+    x.textAlign = 'center';
+    x.fillStyle = '#d4a94a';
+    x.font = '600 24px ui-monospace, Menlo, monospace';
+    x.fillText('C H I N A   T R A V E L   A T L A S', W / 2, 92);
+    x.fillStyle = '#eae4d3';
+    x.font = '700 72px "Songti SC","STSong","Noto Serif SC",serif';
+    x.fillText('山 河 游 历 图', W / 2, 178);
+    x.fillStyle = '#9aa3b8';
+    x.font = '28px "Songti SC",serif';
+    x.fillText('我的旅行足迹', W / 2, 228);
+    /* 迷你版图（等距柱状 + 纬度修正，与主图同款投影） */
+    var K = 16.5, CX = W / 2, CY = 620;
+    function proj(lon, lat) {
+      return [CX + (lon - 104.5) * 0.82 * K, CY - (lat - 36.5) * K];
+    }
+    CHINA_GEO.provinces.forEach(function (prov) {
+      var lit = visitedProv.has(prov.name);
+      prov.polys.forEach(function (ring) {
+        x.beginPath();
+        ring.forEach(function (pt, i2) {
+          var p = proj(pt[0], pt[1]);
+          if (i2 === 0) x.moveTo(p[0], p[1]); else x.lineTo(p[0], p[1]);
+        });
+        x.closePath();
+        x.fillStyle = lit ? 'rgba(212,169,74,.92)' : 'rgba(27,36,64,.9)';
+        x.fill();
+        x.strokeStyle = lit ? 'rgba(243,217,139,.9)' : 'rgba(212,169,74,.28)';
+        x.lineWidth = lit ? 2 : 1;
+        x.stroke();
+      });
+    });
+    CHINA_GEO.nineDash.forEach(function (seg) {
+      x.beginPath();
+      seg.forEach(function (pt, i2) {
+        var p = proj(pt[0], pt[1]);
+        if (i2 === 0) x.moveTo(p[0], p[1]); else x.lineTo(p[0], p[1]);
+      });
+      x.strokeStyle = 'rgba(212,169,74,.55)'; x.lineWidth = 2; x.stroke();
+    });
+    /* 统计 */
+    x.fillStyle = '#d4a94a';
+    x.font = '700 110px "Songti SC",serif';
+    x.fillText(visitedProv.size + ' / 34', W / 2, 1120);
+    x.fillStyle = '#9aa3b8';
+    x.font = '30px "Songti SC",serif';
+    x.fillText('省份点亮 · 已打卡 ' + checkins.size + ' 处胜景', W / 2, 1172);
+    /* 打卡清单（一行截断） */
+    var names = Array.from(checkins).map(function (k) {
+      var u = UNITS[unitByKey[k]]; return u.city || u.spot;
+    });
+    if (names.length) {
+      var line = names.slice(0, 8).join(' · ') + (names.length > 8 ? ' …等 ' + names.length + ' 处' : '');
+      x.fillStyle = '#eae4d3';
+      var fs = 26;
+      x.font = fs + 'px "Songti SC",serif';
+      while (x.measureText(line).width > W - 140 && fs > 16) {
+        fs -= 2; x.font = fs + 'px "Songti SC",serif';
+      }
+      x.fillText(line, W / 2, 1236);
+    }
+    var d = new Date();
+    var ds = d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+    x.fillStyle = '#5a6478';
+    x.font = '22px ui-monospace, Menlo, monospace';
+    x.fillText(ds + '  ·  kimiguo1109.github.io/china-travel-atlas', W / 2, 1356);
+    c.toBlob(function (blob) {
+      if (!blob) return;
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '山河足迹-' + ds + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    }, 'image/png');
+  });
 
   /* 初始化：足迹点亮 + 行程还原 */
   refreshFootprint();
