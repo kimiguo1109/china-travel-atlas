@@ -91,6 +91,16 @@
   .popup-spots a::before{content:'◈';color:var(--gold);font-size:9px;}
   .popup-spots a:hover{color:var(--gold);}
   .popup-spots .ext{color:var(--paper-dim);font-size:10px;}
+  /* ---- 卡片操作：打卡 / 加入行程 ---- */
+  .popup-actions{display:flex;gap:8px;margin:14px 0 0;}
+  .act-btn{
+    flex:1;padding:8px 0;background:none;border:1px solid var(--hairline);border-radius:3px;
+    color:var(--paper);font-size:12px;letter-spacing:.12em;cursor:pointer;
+    font-family:var(--sans);transition:border-color .15s,color .15s,background .15s;
+  }
+  .act-btn:hover{border-color:var(--gold);color:var(--gold);}
+  .act-btn.on{background:rgba(212,169,74,.16);border-color:var(--gold);color:var(--gold);}
+  .act-btn:focus-visible{outline:1.5px solid var(--gold);outline-offset:2px;}
   .popup-link{
     display:inline-flex;align-items:center;gap:6px;margin-top:14px;padding:7px 14px;
     border:1px solid var(--gold-soft);border-radius:2px;color:var(--gold);
@@ -112,6 +122,53 @@
     backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   }
   .popup-close:hover{background:rgba(10,15,29,.8);}
+  /* ---- 行程坞（左下） ---- */
+  .trip-toggle{
+    position:fixed;left:20px;bottom:48px;z-index:16;
+    padding:9px 16px;background:var(--panel);border:1px solid var(--hairline);border-radius:20px;
+    color:var(--paper);font-size:12px;letter-spacing:.14em;cursor:pointer;
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    transition:border-color .15s,color .15s;
+  }
+  .trip-toggle:hover{border-color:var(--gold);color:var(--gold);}
+  .trip-toggle b{color:var(--gold);font-weight:600;margin-left:4px;}
+  .trip-dock{
+    position:fixed;left:20px;bottom:96px;z-index:15;width:250px;
+    background:var(--panel);border:1px solid var(--hairline);border-radius:4px;
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    padding:14px 16px 12px;box-shadow:0 12px 40px rgba(0,0,0,.45);display:none;
+  }
+  .trip-dock.open{display:block;}
+  .trip-head{font-family:var(--serif);font-size:15px;letter-spacing:.1em;margin:0 0 4px;}
+  .trip-km{font-family:var(--mono);font-size:10px;color:var(--gold);letter-spacing:.08em;}
+  .trip-list{list-style:none;margin:6px 0;padding:0;max-height:28vh;overflow-y:auto;scrollbar-width:thin;}
+  .trip-list li{display:flex;align-items:baseline;gap:8px;padding:4px 2px;font-size:12.5px;}
+  .trip-list .t-no{font-family:var(--mono);font-size:10px;color:var(--gold);min-width:14px;}
+  .trip-list .t-del{margin-left:auto;background:none;border:0;color:var(--paper-dim);cursor:pointer;font-size:12px;padding:0 4px;}
+  .trip-list .t-del:hover{color:#e86a4e;}
+  .trip-empty{font-size:11px;color:var(--paper-dim);margin:6px 0;line-height:1.7;}
+  .trip-btns{display:flex;gap:8px;margin:8px 0 2px;}
+  .trip-btns button{
+    flex:1;padding:7px 0;background:none;border:1px solid var(--gold-soft);border-radius:3px;
+    color:var(--gold);font-family:var(--mono);font-size:10px;letter-spacing:.2em;cursor:pointer;
+  }
+  .trip-btns button:hover{background:rgba(212,169,74,.12);}
+  .trip-btns button:disabled{opacity:.35;cursor:default;}
+  .trip-presets-head{font-family:var(--mono);font-size:9px;letter-spacing:.3em;color:var(--gold);opacity:.7;margin:12px 0 6px;}
+  .trip-presets{display:flex;flex-wrap:wrap;gap:6px;}
+  .trip-presets button{
+    padding:5px 10px;background:none;border:1px solid var(--hairline);border-radius:2px;
+    color:var(--paper);font-size:11px;letter-spacing:.06em;cursor:pointer;font-family:var(--serif);
+  }
+  .trip-presets button:hover{border-color:var(--gold);color:var(--gold);}
+  .atlas-foot{
+    font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--gold);
+    margin:8px 0 2px;opacity:.85;
+  }
+  @media (max-width:720px){
+    .trip-toggle{left:12px;bottom:14px;}
+    .trip-dock{left:12px;bottom:62px;width:auto;right:12px;}
+  }
   /* ---- 画面暗角，聚焦地图 ---- */
   .vignette{
     position:fixed;inset:0;z-index:5;pointer-events:none;
@@ -160,7 +217,21 @@
   <hr class="atlas-rule">
   <ul class="stops" id="stops"></ul>
   <button class="overview-btn" id="overviewBtn" type="button">回到全景 · OVERVIEW</button>
+  <p class="atlas-foot" id="footStats"></p>
 </aside>
+
+<div class="trip-dock" id="tripDock">
+  <p class="trip-head">我的行程 <span class="trip-km" id="tripKm"></span></p>
+  <ol class="trip-list" id="tripList"></ol>
+  <p class="trip-empty" id="tripEmpty">在任意城市 / 景点卡片上点「加入行程」，<br>或直接选一条经典路线。</p>
+  <div class="trip-btns">
+    <button id="tripPlay" type="button">▶ 播放路线</button>
+    <button id="tripClear" type="button">清空</button>
+  </div>
+  <p class="trip-presets-head">经典路线 · 一键巡游</p>
+  <div class="trip-presets" id="tripPresets"></div>
+</div>
+<button class="trip-toggle" id="tripToggle" type="button">行程<b id="tripCount">0</b></button>
 
 <div class="vignette" aria-hidden="true"></div>
 
@@ -174,6 +245,10 @@
     <p class="popup-desc" id="popupDesc"></p>
     <p class="popup-en" id="popupDescEn"></p>
     <ul class="popup-spots" id="popupSpots"></ul>
+    <div class="popup-actions">
+      <button class="act-btn" id="btnCheckin" type="button">打卡此处</button>
+      <button class="act-btn" id="btnRoute" type="button">加入行程</button>
+    </div>
     <a class="popup-link" id="popupLink" href="#" target="_blank" rel="noopener">景区详情 ↗</a>
   </div>
 </section>
@@ -1022,6 +1097,31 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
   var UNITS = ATTRACTIONS.concat(CITIES);
   var MUNI = { '北京': 1, '上海': 1, '天津': 1, '重庆': 1, '香港': 1, '澳门': 1 };
   function baikeUrl(name) { return 'https://baike.baidu.com/item/' + encodeURIComponent(name); }
+
+  /* ================= 足迹打卡 / 行程（localStorage 持久化） ================= */
+  var store = {
+    load: function (k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    save: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 隐私模式下静默降级为不持久化 */ } }
+  };
+  function unitKey(u) { return (u.type === 'city' ? 'c:' : 's:') + (u.city || u.spot); }
+  var unitByKey = {};
+  UNITS.forEach(function (u, i) { unitByKey[unitKey(u)] = i; });
+  var checkins = new Set(store.load('atlas_checkins', []).filter(function (k) { return k in unitByKey; }));
+  var route = store.load('atlas_route', []).filter(function (k) { return k in unitByKey; });
+  var routeSet = new Set(route);
+  var visitedProv = new Set();
+  function recomputeVisited() {
+    visitedProv.clear();
+    checkins.forEach(function (k) { visitedProv.add(UNITS[unitByKey[k]].p); });
+  }
+  recomputeVisited();
+  function haversineKm(a, b) {
+    var R = 6371, d2r = Math.PI / 180;
+    var dLat = (b.lat - a.lat) * d2r, dLon = (b.lon - a.lon) * d2r;
+    var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(a.lat * d2r) * Math.cos(b.lat * d2r) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.sqrt(s));
+  }
   function mediaOf(u) {
     if (typeof SPOT_MEDIA === 'undefined') return null;
     return SPOT_MEDIA[u.type === 'city' ? u.photoOf : u.spot] || null;
@@ -1208,8 +1308,21 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     return s;
   }
 
+  /* 共享的「已打卡」角标纹理（金圈金勾） */
+  var badgeMat = (function () {
+    var c = document.createElement('canvas'); c.width = c.height = 96;
+    var x = c.getContext('2d');
+    x.fillStyle = '#d4a94a';
+    x.beginPath(); x.arc(48, 48, 44, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = '#0a0f1d'; x.lineWidth = 11; x.lineCap = 'round';
+    x.beginPath(); x.moveTo(27, 50); x.lineTo(42, 65); x.lineTo(70, 33); x.stroke();
+    var tex = new THREE.CanvasTexture(c);
+    if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  })();
+
   var MEDAL_SCALE = 0.66, MEDAL_SCALE_HOT = 0.84;
-  var markers = [], medals = [], stems = [], rings = [], labels = [], leaders = [], hitTargets = [];
+  var markers = [], medals = [], stems = [], rings = [], labels = [], leaders = [], badges = [], hitTargets = [];
   UNITS.forEach(function (c, i) {
     var xz = XZ(c.lon, c.lat);
     var top = (provinceOf[c.p] || { top: BASE_H }).top;
@@ -1240,12 +1353,16 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     var hit = new THREE.Mesh(new THREE.SphereGeometry(0.48, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
     hit.position.y = 1.02;
     hit.userData.spotIndex = i;
-    g.add(stem, medal, ring, leader, lab, hit);
-    g.visible = !!c.flag;
+    var badge = new THREE.Sprite(badgeMat);
+    badge.scale.set(0.2, 0.2, 1);
+    badge.position.set(0.24, 1.28, 0.01);
+    badge.visible = checkins.has(unitKey(c));
+    g.add(stem, medal, ring, leader, lab, hit, badge);
+    g.visible = !!c.flag || routeSet.has(unitKey(c));
     if (!REDUCED && c.flag) g.scale.setScalar(0.001);
     scene.add(g);
     markers.push(g); medals.push(medal); stems.push(stem); rings.push(ring);
-    labels.push(lab); leaders.push(leader); hitTargets.push(hit);
+    labels.push(lab); leaders.push(leader); badges.push(badge); hitTargets.push(hit);
     c._pos = new THREE.Vector3(xz[0], top, xz[1]);
   });
 
@@ -1330,7 +1447,10 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
   }
   function setMarkersForMode() {
     UNITS.forEach(function (c, i) {
-      markers[i].visible = (mode === 'country') ? (c.type === 'spot' && !!c.flag) : unitVisibleInProvince(c, currentProv);
+      /* 全国视图：旗舰 + 行程中的站点都常显，让自定义路线在全景可见 */
+      markers[i].visible = (mode === 'country')
+        ? ((c.type === 'spot' && !!c.flag) || routeSet.has(unitKey(c)))
+        : unitVisibleInProvince(c, currentProv);
       if (mode === 'country') applyOffset(i, 0, 0);
     });
     if (mode === 'province') {
@@ -1417,6 +1537,7 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     downPos = { x: e.clientX, y: e.clientY };
     moved = false; tw = null; lastActive = performance.now();
+    stopTour(); /* 用户接管即停止巡游 */
     if (pointers.size === 2) {
       var ps = Array.from(pointers.values());
       pinchDist = Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y);
@@ -1462,7 +1583,8 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
   var hoverIdx = -1, hoverProv = null;
   function setProvinceGlow(name, on) {
     var rec = provinceOf[name];
-    if (rec) rec.mat.emissive.setHex(on ? 0x1c2418 : 0x000000);
+    /* 熄灭时回落到「足迹点亮」的暖金底色而非纯黑 */
+    if (rec) rec.mat.emissive.setHex(on ? 0x1c2418 : (visitedProv.has(name) ? 0x201704 : 0x000000));
   }
   function hoverCheck(e) {
     setNDC(e);
@@ -1635,6 +1757,7 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
       : (c.p + (c.flag ? ' · 代表胜景' : ''));
     document.getElementById('popupDesc').textContent = c.desc;
     document.getElementById('popupDescEn').textContent = c.descEn;
+    refreshCardActions();
     popup.classList.add('open');
     if (fly) {
       tween({
@@ -1659,9 +1782,169 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
   document.getElementById('zoomOut').addEventListener('click', function () { tw = null; orbit.r *= 1.22; clampOrbit(); lastActive = performance.now(); });
   window.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    stopTour();
     if (popup.classList.contains('open')) closePopup();
     else if (mode === 'province') exitToCountry();
   });
+
+  /* ================= 打卡 / 行程 / 巡游 ================= */
+  var btnCheckin = document.getElementById('btnCheckin');
+  var btnRoute = document.getElementById('btnRoute');
+  var footStats = document.getElementById('footStats');
+  var tripDock = document.getElementById('tripDock');
+  var tripToggle = document.getElementById('tripToggle');
+  var tripCount = document.getElementById('tripCount');
+  var tripList = document.getElementById('tripList');
+  var tripEmpty = document.getElementById('tripEmpty');
+  var tripKm = document.getElementById('tripKm');
+  var tripPlay = document.getElementById('tripPlay');
+
+  function refreshFootprint() {
+    recomputeVisited();
+    footStats.textContent = '足迹 ' + visitedProv.size + '/34 省 · 已打卡 ' + checkins.size + ' 处';
+  }
+  function refreshCardActions() {
+    if (activeIdx < 0) return;
+    var k = unitKey(UNITS[activeIdx]);
+    var checked = checkins.has(k), inRoute = routeSet.has(k);
+    btnCheckin.textContent = checked ? '✓ 已打卡' : '打卡此处';
+    btnCheckin.classList.toggle('on', checked);
+    btnRoute.textContent = inRoute ? '✓ 已在行程' : '加入行程';
+    btnRoute.classList.toggle('on', inRoute);
+  }
+  btnCheckin.addEventListener('click', function () {
+    if (activeIdx < 0) return;
+    var u = UNITS[activeIdx], k = unitKey(u);
+    if (checkins.has(k)) checkins.delete(k); else checkins.add(k);
+    badges[activeIdx].visible = checkins.has(k);
+    store.save('atlas_checkins', Array.from(checkins));
+    refreshFootprint();
+    /* 点亮/熄灭省份底光（当前非 hover 态时立即生效） */
+    if (u.p !== hoverProv && u.p !== currentProv) setProvinceGlow(u.p, false);
+    refreshCardActions();
+  });
+  btnRoute.addEventListener('click', function () {
+    if (activeIdx < 0) return;
+    var k = unitKey(UNITS[activeIdx]);
+    var at = route.indexOf(k);
+    if (at >= 0) route.splice(at, 1); else route.push(k);
+    commitRoute();
+    refreshCardActions();
+  });
+
+  /* 路线可视化：金色虚线 + 沿线流光 */
+  var routeLine = null, routeComet = null, routeCurve = null;
+  function rebuildRouteLine() {
+    if (routeLine) { scene.remove(routeLine); routeLine.geometry.dispose(); routeLine.material.dispose(); routeLine = null; }
+    if (routeComet) { scene.remove(routeComet); routeComet.geometry.dispose(); routeComet.material.dispose(); routeComet = null; }
+    routeCurve = null;
+    if (route.length < 2) return;
+    var pts = route.map(function (k) {
+      var u = UNITS[unitByKey[k]];
+      return u._pos.clone().setY(u._pos.y + 0.14);
+    });
+    routeCurve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.3);
+    routeLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(routeCurve.getPoints(Math.max(120, pts.length * 60))),
+      new THREE.LineDashedMaterial({ color: GOLD, transparent: true, opacity: 0.7, dashSize: 0.3, gapSize: 0.16 })
+    );
+    routeLine.computeLineDistances();
+    scene.add(routeLine);
+    routeComet = new THREE.Mesh(
+      new THREE.SphereGeometry(0.07, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0xf3d98b, transparent: true, opacity: 0.95 })
+    );
+    scene.add(routeComet);
+  }
+  function routeTotalKm() {
+    var km = 0;
+    for (var i = 1; i < route.length; i++) {
+      km += haversineKm(UNITS[unitByKey[route[i - 1]]], UNITS[unitByKey[route[i]]]);
+    }
+    return Math.round(km);
+  }
+  function updateTripUI() {
+    tripCount.textContent = route.length;
+    tripKm.textContent = route.length > 1 ? '· 全程约 ' + routeTotalKm().toLocaleString() + ' km' : '';
+    tripEmpty.style.display = route.length ? 'none' : '';
+    tripPlay.disabled = route.length < 1;
+    tripList.innerHTML = '';
+    route.forEach(function (k, ord) {
+      var u = UNITS[unitByKey[k]];
+      var li = document.createElement('li');
+      var no = document.createElement('span'); no.className = 't-no'; no.textContent = String(ord + 1).padStart(2, '0');
+      var nm = document.createElement('span'); nm.textContent = (u.city || u.spot) + '（' + u.p + '）';
+      var del = document.createElement('button'); del.className = 't-del'; del.textContent = '✕'; del.setAttribute('aria-label', '移除');
+      del.addEventListener('click', function () { route.splice(ord, 1); commitRoute(); refreshCardActions(); });
+      li.appendChild(no); li.appendChild(nm); li.appendChild(del);
+      tripList.appendChild(li);
+    });
+  }
+  function commitRoute() {
+    routeSet = new Set(route);
+    store.save('atlas_route', route);
+    rebuildRouteLine();
+    updateTripUI();
+    setMarkersForMode(); /* 行程站点在全国视图常显 */
+  }
+  tripToggle.addEventListener('click', function () { tripDock.classList.toggle('open'); });
+  document.getElementById('tripClear').addEventListener('click', function () {
+    stopTour(); route = []; commitRoute(); refreshCardActions();
+  });
+
+  /* 巡游播放：沿行程逐站飞行并亮卡 */
+  var touring = false, tourTimer = null;
+  function stopTour() {
+    touring = false;
+    if (tourTimer) { clearTimeout(tourTimer); tourTimer = null; }
+  }
+  function startTour() {
+    stopTour();
+    if (!route.length) return;
+    if (mode === 'province') exitToCountry();
+    touring = true;
+    var i = 0;
+    function step() {
+      if (!touring) return;
+      if (i >= route.length) { touring = false; return; }
+      var idx = unitByKey[route[i]]; i++;
+      if (idx !== undefined) openSpotCard(idx, true);
+      tourTimer = setTimeout(step, 3100);
+    }
+    tourTimer = setTimeout(step, mode === 'country' ? 300 : 1400);
+  }
+  tripPlay.addEventListener('click', startTour);
+
+  /* 经典路线预设 */
+  var PRESETS = [
+    { name: '丝绸之路', stops: ['秦始皇兵马俑', '兰州中山桥', '嘉峪关', '敦煌莫高窟', '天山天池', '赛里木湖'] },
+    { name: '江南水乡', stops: ['外滩', '周庄', '拙政园', '乌镇', '杭州西湖'] },
+    { name: '川藏天路', stops: ['都江堰', '峨眉山', '稻城亚丁', '布达拉宫', '珠峰大本营'] },
+    { name: '东北冰雪', stops: ['冰雪大世界', '圣索菲亚教堂', '雾凇岛', '长白山天池'] }
+  ];
+  (function () {
+    var box = document.getElementById('tripPresets');
+    PRESETS.forEach(function (p) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = p.name;
+      b.addEventListener('click', function () {
+        stopTour();
+        route = p.stops.map(function (s) { return 's:' + s; }).filter(function (k) { return k in unitByKey; });
+        commitRoute();
+        refreshCardActions();
+        tripDock.classList.add('open');
+        startTour();
+      });
+      box.appendChild(b);
+    });
+  })();
+
+  /* 初始化：足迹点亮 + 行程还原 */
+  refreshFootprint();
+  visitedProv.forEach(function (p) { setProvinceGlow(p, false); });
+  rebuildRouteLine();
+  updateTripUI();
 
   buildCountryList();
 
@@ -1727,7 +2010,14 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
       m.position.y = 1.02 * modeK;
       labels[i].position.y = 1.66 * modeK;
       hitTargets[i].position.y = 1.02 * modeK;
+      badges[i].scale.set(0.2 * modeK, 0.2 * modeK, 1);
+      badges[i].position.set(m.position.x + 0.24 * modeK, 1.28 * modeK, m.position.z + 0.01);
     });
+
+    /* 行程流光沿线游走 */
+    if (routeCurve && routeComet && !REDUCED) {
+      routeComet.position.copy(routeCurve.getPoint((t * 0.045) % 1));
+    }
 
     /* 标签：省视图内全部常显；全国视图按距离淡入 */
     camPos.copy(camera.position);
