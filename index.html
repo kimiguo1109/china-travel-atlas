@@ -1905,11 +1905,16 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     stopTour(); route = []; commitRoute(); refreshCardActions();
   });
 
-  /* 巡游播放：沿行程逐站飞行并亮卡 */
+  /* 巡游播放：沿行程逐站飞行并亮卡，按钮兼作停止并显示进度 */
   var touring = false, tourTimer = null;
+  function setTourBtn(cur) {
+    tripPlay.textContent = touring ? ('■ 停止 · ' + cur + '/' + route.length) : '▶ 播放路线';
+  }
   function stopTour() {
+    var was = touring;
     touring = false;
     if (tourTimer) { clearTimeout(tourTimer); tourTimer = null; }
+    if (was) setTourBtn(0);
   }
   function startTour() {
     stopTour();
@@ -1919,14 +1924,17 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     var i = 0;
     function step() {
       if (!touring) return;
-      if (i >= route.length) { touring = false; return; }
+      if (i >= route.length) { touring = false; setTourBtn(0); return; }
       var idx = unitByKey[route[i]]; i++;
+      setTourBtn(i);
       if (idx !== undefined) openSpotCard(idx, true);
       tourTimer = setTimeout(step, 3100);
     }
     tourTimer = setTimeout(step, mode === 'country' ? 300 : 1400);
   }
-  tripPlay.addEventListener('click', startTour);
+  tripPlay.addEventListener('click', function () {
+    if (touring) stopTour(); else startTour();
+  });
 
   /* 经典路线预设 */
   var PRESETS = [
@@ -1953,19 +1961,37 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     });
   })();
 
-  /* 🎲 下一站抽签：从未打卡的景点里随机抽一处并飞过去 */
-  document.getElementById('luckyBtn').addEventListener('click', function () {
+  /* 🎲 下一站抽签：候选名快速轮播制造悬念，定格后飞往抽中的景点 */
+  var luckyBtn = document.getElementById('luckyBtn');
+  luckyBtn.addEventListener('click', function () {
+    if (luckyBtn.disabled) return;
     stopTour();
     var candidates = [];
     UNITS.forEach(function (u, i) {
       if (u.type === 'spot' && !checkins.has(unitKey(u))) candidates.push(i);
     });
-    if (!candidates.length) return;
-    var idx = candidates[Math.floor(Math.random() * candidates.length)];
-    spotlightIdx = idx;
-    setMarkersForMode();
-    openSpotCard(idx, true);
-    lastActive = performance.now();
+    if (!candidates.length) { luckyBtn.textContent = '🏆 全部打卡达成！'; return; }
+    var finalIdx = candidates[Math.floor(Math.random() * candidates.length)];
+    luckyBtn.disabled = true;
+    var hops = 0, HOPS_TOTAL = 8;
+    var iv = setInterval(function () {
+      hops++;
+      if (hops < HOPS_TOTAL) {
+        var peek = UNITS[candidates[Math.floor(Math.random() * candidates.length)]];
+        luckyBtn.textContent = '🎲 ' + peek.spot + '…';
+        return;
+      }
+      clearInterval(iv);
+      luckyBtn.textContent = '→ ' + UNITS[finalIdx].spot + '！';
+      spotlightIdx = finalIdx;
+      setMarkersForMode();
+      openSpotCard(finalIdx, true);
+      lastActive = performance.now();
+      setTimeout(function () {
+        luckyBtn.textContent = '🎲 下一站去哪';
+        luckyBtn.disabled = false;
+      }, 1600);
+    }, 120);
   });
 
   /* 导出足迹卡：canvas 手绘迷你版图（点亮省份填金）+ 统计，下载 PNG */
