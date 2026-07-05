@@ -196,6 +196,13 @@
   }
   .export-btn:hover{color:var(--gold);border-color:var(--gold-soft);}
   .export-btn:focus-visible{outline:1.5px solid var(--gold);outline-offset:2px;}
+  .global-link{
+    display:block;text-align:center;margin:6px 0 2px;padding:8px 0;
+    border:1px dashed var(--hairline);border-radius:3px;color:var(--paper-dim);
+    font-size:11px;letter-spacing:.14em;text-decoration:none;transition:color .15s,border-color .15s;
+  }
+  .global-link:hover{color:var(--gold);border-color:var(--gold-soft);}
+  .global-link:focus-visible{outline:1.5px solid var(--gold);outline-offset:2px;}
   @media (max-width:720px){
     .trip-toggle{left:12px;bottom:14px;}
     .trip-dock{left:12px;bottom:62px;width:auto;right:12px;}
@@ -256,6 +263,7 @@
   <button class="overview-btn" id="overviewBtn" type="button">回到全景 · OVERVIEW</button>
   <p class="atlas-foot" id="footStats"></p>
   <button class="export-btn" id="exportBtn" type="button">导出足迹卡 · PNG</button>
+  <a class="global-link" href="https://kimiguo1109.github.io/china-travel-atlas/global/">🌍 寰宇游历图 · 环球版 →</a>
 </aside>
 
 <div class="trip-dock" id="tripDock">
