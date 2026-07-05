@@ -26,7 +26,23 @@
   .atlas-title{font-family:var(--serif);font-size:26px;font-weight:700;letter-spacing:.14em;margin:0;line-height:1.25;}
   .atlas-sub{font-size:11px;color:var(--paper-dim);margin:6px 0 0;letter-spacing:.04em;}
   .atlas-rule{height:1px;background:linear-gradient(90deg,var(--gold-soft),transparent);border:0;margin:14px 0 8px;}
-  .stops{list-style:none;margin:0;padding:0;max-height:42vh;overflow-y:auto;scrollbar-width:thin;}
+  .search-box{
+    width:100%;box-sizing:border-box;margin:0 0 8px;padding:9px 12px;
+    background:rgba(10,15,29,.6);border:1px solid var(--hairline);border-radius:3px;
+    color:var(--paper);font-family:var(--sans);font-size:13px;outline:none;
+    transition:border-color .15s;
+  }
+  .search-box:focus{border-color:var(--gold);}
+  .search-box::placeholder{color:var(--paper-dim);opacity:.7;}
+  .search-results{list-style:none;margin:0 0 6px;padding:0;}
+  .search-results li{
+    display:flex;align-items:baseline;gap:9px;padding:7px 8px;border-radius:3px;
+    cursor:pointer;font-family:var(--serif);font-size:14px;
+  }
+  .search-results li:hover,.search-results li:focus{background:rgba(212,169,74,.12);outline:none;}
+  .search-results .sr-meta{margin-left:auto;font-family:var(--sans);font-size:10px;color:var(--paper-dim);}
+  .search-results .sr-empty{cursor:default;color:var(--paper-dim);font-size:12px;font-family:var(--sans);}
+  .stops{list-style:none;margin:0;padding:0;max-height:38vh;overflow-y:auto;scrollbar-width:thin;}
   .stops li{display:flex;align-items:baseline;gap:9px;padding:6px 6px;border-radius:3px;cursor:pointer;transition:background .15s;}
   .stops li:hover{background:rgba(212,169,74,.08);}
   .stops li.active{background:rgba(212,169,74,.14);}
@@ -122,6 +138,9 @@
   <h1 class="atlas-title">寰宇游历图</h1>
   <p class="atlas-sub">三十四处世界胜景 · 一球尽览</p>
   <hr class="atlas-rule">
+  <input class="search-box" id="searchBox" type="text" placeholder="搜索目的地 / 国家…"
+    role="combobox" aria-expanded="false" aria-controls="searchResults" aria-label="搜索目的地">
+  <ul class="search-results" id="searchResults" role="listbox"></ul>
   <ul class="stops" id="stops"></ul>
   <button class="tour-btn" id="tourBtn" type="button">▶ 环球巡游 · GRAND TOUR</button>
   <p class="atlas-foot" id="footStats"></p>
@@ -815,6 +834,72 @@ var GLOBAL_MEDIA = {"埃菲尔铁塔": {"img": "data:image/jpeg;base64,/9j/4AAQS
     var s = SPOTS.find(function (x) { return x.zh === zh; });
     if (s) setCountryGlow(s.country, false);
   });
+
+  /* 🔍 搜索：目的地中英文 / 国家名 直达 */
+  (function () {
+    var box = document.getElementById('searchBox');
+    var resUl = document.getElementById('searchResults');
+    var debounce = null;
+    function clearResults() {
+      resUl.innerHTML = '';
+      box.setAttribute('aria-expanded', 'false');
+    }
+    function go(i) {
+      box.value = '';
+      clearResults();
+      openSpot(i, true);
+    }
+    box.addEventListener('input', function () {
+      clearTimeout(debounce);
+      debounce = setTimeout(function () {
+        var q = box.value.trim().toLowerCase();
+        clearResults();
+        if (!q) return;
+        var hits = [];
+        SPOTS.forEach(function (c, i) {
+          var hay = (c.zh + ' ' + c.en + ' ' + c.country + ' ' + c.cZh + ' ' + c.region).toLowerCase();
+          if (hay.indexOf(q) >= 0) hits.push(i);
+        });
+        box.setAttribute('aria-expanded', hits.length ? 'true' : 'false');
+        if (!hits.length) {
+          var li0 = document.createElement('li');
+          li0.className = 'sr-empty';
+          li0.textContent = '没有匹配的目的地';
+          resUl.appendChild(li0);
+          return;
+        }
+        hits.slice(0, 6).forEach(function (i) {
+          var c = SPOTS[i];
+          var li = document.createElement('li');
+          li.tabIndex = 0;
+          li.setAttribute('role', 'option');
+          li.innerHTML = '<span>' + c.zh + '</span><span class="sr-meta">' + c.cZh + ' · ' + c.region + '</span>';
+          li.addEventListener('click', function () { go(i); });
+          li.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); go(i); return; }
+            if (e.key === 'ArrowDown' && li.nextElementSibling) { e.preventDefault(); li.nextElementSibling.focus(); }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              if (li.previousElementSibling) li.previousElementSibling.focus(); else box.focus();
+            }
+            if (e.key === 'Escape') { box.value = ''; clearResults(); box.focus(); e.stopPropagation(); }
+          });
+          resUl.appendChild(li);
+        });
+      }, 140);
+    });
+    box.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { box.value = ''; clearResults(); box.blur(); e.stopPropagation(); }
+      if (e.key === 'ArrowDown') {
+        var first0 = resUl.querySelector('li[role="option"]');
+        if (first0) { e.preventDefault(); first0.focus(); }
+      }
+      if (e.key === 'Enter') {
+        var first = resUl.querySelector('li[role="option"]');
+        if (first) first.click();
+      }
+    });
+  })();
 
   /* 导出环球足迹卡：等距投影世界迷你图，点亮国家填金 */
   document.getElementById('exportBtn').addEventListener('click', function () {
