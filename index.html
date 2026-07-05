@@ -198,10 +198,13 @@
     .trip-toggle{left:12px;bottom:14px;}
     .trip-dock{left:12px;bottom:62px;width:auto;right:12px;}
   }
-  /* ---- 画面暗角，聚焦地图 ---- */
+  /* ---- 画面暗角，聚焦地图（白昼减弱） ---- */
   .vignette{
     position:fixed;inset:0;z-index:5;pointer-events:none;
     background:radial-gradient(ellipse at 50% 42%,transparent 52%,rgba(4,6,12,.5) 100%);
+  }
+  body.day .vignette{
+    background:radial-gradient(ellipse at 50% 42%,transparent 60%,rgba(40,60,80,.22) 100%);
   }
 
   /* ---- 左下：操作提示 ---- */
@@ -296,6 +299,7 @@
 <p class="hint"><b>拖拽</b> 旋转 · <b>滚轮</b> 缩放 · <b>点击</b> 城市驿站</p>
 
 <div class="zoom-stack">
+  <button class="zoom-btn" id="themeBtn" type="button" aria-label="切换昼夜">☀</button>
   <button class="zoom-btn" id="zoomIn" type="button" aria-label="放大">+</button>
   <button class="zoom-btn" id="zoomOut" type="button" aria-label="缩小">−</button>
 </div>
@@ -1007,7 +1011,8 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
 
   var camera = new THREE.PerspectiveCamera(42, 1, 0.05, 400);
 
-  scene.add(new THREE.AmbientLight(0x3d4763, 1.6));
+  var ambientL = new THREE.AmbientLight(0x3d4763, 1.6);
+  scene.add(ambientL);
   var key = new THREE.DirectionalLight(0xffe9c2, 2.2);
   key.position.set(18, 30, 14);
   scene.add(key);
@@ -1213,6 +1218,9 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     var rec = {
       top: h, mat: mat, sideMat: sideMat,
       baseColor: color.clone(), baseSideColor: color.clone().multiplyScalar(0.45),
+      /* 白昼配色：轻微提亮 + 提饱和，晨光下仍保留高程层次 */
+      dayColor: color.clone().multiplyScalar(1.5).lerp(new THREE.Color(0xffffff), 0.08),
+      daySideColor: color.clone().multiplyScalar(1.1),
       borderMats: [], center: prov.center,
       bbox: { minX: 1e9, maxX: -1e9, minZ: 1e9, maxZ: -1e9 }
     };
@@ -1258,23 +1266,26 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     ));
   });
 
-  /* 底盘 */
-  (function () {
+  /* 底盘（昼夜两套渐变纹理） */
+  function makeDiscTex(stops) {
     var c = document.createElement('canvas'); c.width = c.height = 512;
     var x = c.getContext('2d');
     var g = x.createRadialGradient(256, 256, 40, 256, 256, 256);
-    g.addColorStop(0, '#121a30'); g.addColorStop(0.65, '#0c1223'); g.addColorStop(1, '#0a0f1d');
+    stops.forEach(function (s) { g.addColorStop(s[0], s[1]); });
     x.fillStyle = g; x.fillRect(0, 0, 512, 512);
     var tex = new THREE.CanvasTexture(c);
     if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
-    var disc = new THREE.Mesh(new THREE.CircleGeometry(95, 64), new THREE.MeshBasicMaterial({ map: tex }));
-    disc.rotation.x = -Math.PI / 2;
-    disc.position.y = -0.02;
-    scene.add(disc);
-  })();
+    return tex;
+  }
+  var discNightTex = makeDiscTex([[0, '#121a30'], [0.65, '#0c1223'], [1, '#0a0f1d']]);
+  var discDayTex = makeDiscTex([[0, '#d4e0ea'], [0.65, '#c3d3e0'], [1, '#b5c7d6']]);
+  var disc = new THREE.Mesh(new THREE.CircleGeometry(95, 64), new THREE.MeshBasicMaterial({ map: discNightTex }));
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.y = -0.02;
+  scene.add(disc);
 
-  /* 星野 */
-  (function () {
+  /* 星野（白昼隐藏） */
+  var stars = (function () {
     var n = 650, pos = new Float32Array(n * 3), seed = 42;
     function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
     for (var i = 0; i < n; i++) {
@@ -1285,9 +1296,11 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     }
     var geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+    var pts = new THREE.Points(geo, new THREE.PointsMaterial({
       color: 0x9db1d8, size: 0.32, transparent: true, opacity: 0.75
-    })));
+    }));
+    scene.add(pts);
+    return pts;
   })();
 
   /* ================= 胜景/城市徽章（真实照片 + 金环） ================= */
@@ -1473,13 +1486,18 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
 
   /* ================= 两级导航状态 ================= */
   var mode = 'country', currentProv = null;
+  var theme = store.load('atlas_theme', 'night');
 
   function dimProvince(name, dim) {
     var rec = provinceOf[name];
     if (!rec) return;
-    rec.mat.color.copy(rec.baseColor).multiplyScalar(dim ? 0.3 : 1);
-    rec.sideMat.color.copy(rec.baseSideColor).multiplyScalar(dim ? 0.3 : 1);
-    rec.borderMats.forEach(function (m) { m.opacity = dim ? 0.05 : 0.16; });
+    var isDay = theme === 'day';
+    rec.mat.color.copy(isDay ? rec.dayColor : rec.baseColor).multiplyScalar(dim ? (isDay ? 0.55 : 0.3) : 1);
+    rec.sideMat.color.copy(isDay ? rec.daySideColor : rec.baseSideColor).multiplyScalar(dim ? (isDay ? 0.55 : 0.3) : 1);
+    rec.borderMats.forEach(function (m) {
+      m.color.setHex(isDay ? 0x8a6f3c : GOLD);
+      m.opacity = dim ? 0.06 : (isDay ? 0.3 : 0.16);
+    });
   }
   /* 省视图单元：直辖市/港澳 = 景点；其余省份 = 城市 */
   function unitVisibleInProvince(u, prov) {
@@ -2252,6 +2270,38 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     }
   });
 
+  /* ☀☾ 昼夜主题切换 */
+  var themeBtn = document.getElementById('themeBtn');
+  function applyTheme() {
+    var day = theme === 'day';
+    scene.background.setHex(day ? 0xbfd2e2 : 0x0a0f1d);
+    scene.fog.color.setHex(day ? 0xbfd2e2 : 0x0a0f1d);
+    /* 浅色雾会把地形与徽章洗白，白昼大幅降低雾密度 */
+    scene.fog.density = day ? 0.0016 : 0.006;
+    ambientL.color.setHex(day ? 0xe6edf5 : 0x3d4763);
+    ambientL.intensity = day ? 1.55 : 1.6;
+    key.color.setHex(day ? 0xfff3dd : 0xffe9c2);
+    key.intensity = day ? 1.7 : 2.2;
+    rim.intensity = day ? 0.45 : 1.0;
+    stars.visible = !day;
+    disc.material.map = day ? discDayTex : discNightTex;
+    disc.material.needsUpdate = true;
+    /* 重刷全部省面配色（保留当前压暗/点亮状态） */
+    CHINA_GEO.provinces.forEach(function (p) {
+      dimProvince(p.name, mode === 'province' && p.name !== currentProv);
+    });
+    visitedProv.forEach(function (p) { if (p !== hoverProv && p !== currentProv) setProvinceGlow(p, false); });
+    document.body.classList.toggle('day', day);
+    themeBtn.textContent = day ? '☾' : '☀';
+    themeBtn.setAttribute('aria-label', day ? '切换到夜航' : '切换到晨光');
+  }
+  themeBtn.addEventListener('click', function () {
+    theme = (theme === 'day') ? 'night' : 'day';
+    store.save('atlas_theme', theme);
+    applyTheme();
+  });
+  applyTheme();
+
   /* 初始化：足迹点亮 + 行程还原 */
   refreshFootprint();
   visitedProv.forEach(function (p) { setProvinceGlow(p, false); });
@@ -2293,15 +2343,13 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
     }
 
     if (!REDUCED) {
-      /* 开场：旗舰徽章逐个升起（只对可见 marker 生效） */
-      if (t < 4) {
-        markers.forEach(function (m, i) {
-          if (!UNITS[i].flag) return;
-          var k = Math.min(1, Math.max(0, (t - 0.4 - i * 0.05) / 0.45));
-          if (k < 1) m.scale.setScalar(Math.max(0.001, 1 - Math.pow(1 - k, 3)));
-          else if (m.scale.x !== 1) m.scale.setScalar(1);
-        });
-      }
+      /* 开场：旗舰徽章逐个升起。不能用 t<4 截断——后台标签页 rAF 被节流时
+         前 4 秒可能只跑一两帧，归位逻辑会被永久跳过、徽章卡在 0.001 */
+      markers.forEach(function (m, i) {
+        if (!UNITS[i].flag || m.scale.x === 1) return;
+        var k = Math.min(1, Math.max(0, (t - 0.4 - i * 0.05) / 0.45));
+        m.scale.setScalar(k >= 1 ? 1 : Math.max(0.001, 1 - Math.pow(1 - k, 3)));
+      });
       rings.forEach(function (r, i) {
         if (!markers[i].visible) return;
         var s = 1 + 0.07 * Math.sin(t * 2.2 + i * 1.1);
