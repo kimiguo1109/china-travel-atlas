@@ -68,6 +68,10 @@
   .stops li.active{background:rgba(212,169,74,.14);}
   .stops li.active .stop-zh{color:var(--gold);}
   .stop-no{font-family:var(--mono);font-size:10px;color:var(--gold);opacity:.75;min-width:18px;}
+  .stop-thumb{
+    width:26px;height:26px;border-radius:50%;object-fit:cover;flex:none;align-self:center;
+    border:1.5px solid var(--gold-soft);background:#141c30;
+  }
   .stop-zh{font-family:var(--serif);font-size:15px;letter-spacing:.08em;}
   .stop-icon{margin-left:auto;font-size:11px;color:var(--paper-dim);}
   .overview-btn{
@@ -223,6 +227,7 @@
     .stops{display:flex;max-height:none;overflow-x:auto;overflow-y:hidden;gap:2px;padding-bottom:4px;}
     .stops li{flex:0 0 auto;padding:5px 10px;}
     .stop-icon{display:none;}
+    .stop-thumb{width:22px;height:22px;}
     .overview-btn{margin-top:6px;}
     .popup{right:12px;left:12px;bottom:12px;width:auto;}
     .hint{display:none;}
@@ -1683,6 +1688,12 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
       li.setAttribute('role', 'button');
       li.innerHTML = '<span class="stop-no">' + String(no).padStart(2, '0') + '</span>' +
         '<span class="stop-zh">' + c.p + '</span><span class="stop-icon">' + c.spot + '</span>';
+      var m = (typeof SPOT_MEDIA !== 'undefined') ? SPOT_MEDIA[c.spot] : null;
+      if (m && m.img) {
+        var th = document.createElement('img');
+        th.className = 'stop-thumb'; th.src = m.img; th.alt = ''; th.loading = 'lazy';
+        li.insertBefore(th, li.firstChild);
+      }
       function go() { enterProvince(c.p); }
       li.addEventListener('click', go);
       li.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
@@ -1717,6 +1728,12 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
       li.setAttribute('role', 'button');
       li.innerHTML = '<span class="stop-no">' + String(no).padStart(2, '0') + '</span>' +
         '<span class="stop-zh">' + zh + '</span>' + (icon ? '<span class="stop-icon">' + icon + '</span>' : '');
+      var m = mediaOf(c);
+      if (m && m.img) {
+        var th = document.createElement('img');
+        th.className = 'stop-thumb'; th.src = m.img; th.alt = ''; th.loading = 'lazy';
+        li.insertBefore(th, li.firstChild);
+      }
       function go() { openSpotCard(i, true); }
       li.addEventListener('click', go);
       li.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
@@ -2166,13 +2183,26 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
           var mt = document.createElement('span'); mt.className = 'sr-meta'; mt.textContent = it.meta;
           li.appendChild(nm); li.appendChild(mt);
           li.addEventListener('click', function () { go(it); });
-          li.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(it); } });
+          li.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); go(it); return; }
+            /* ↑/↓ 在结果间移动焦点，越过首条回到输入框 */
+            if (e.key === 'ArrowDown' && li.nextElementSibling) { e.preventDefault(); li.nextElementSibling.focus(); }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              if (li.previousElementSibling) li.previousElementSibling.focus(); else box.focus();
+            }
+            if (e.key === 'Escape') { box.value = ''; clearResults(); box.focus(); e.stopPropagation(); }
+          });
           resUl.appendChild(li);
         });
       }, 140);
     });
     box.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { box.value = ''; clearResults(); box.blur(); e.stopPropagation(); }
+      if (e.key === 'ArrowDown') {
+        var first0 = resUl.querySelector('li[role="button"]');
+        if (first0) { e.preventDefault(); first0.focus(); }
+      }
       if (e.key === 'Enter') {
         var first = resUl.querySelector('li[role="button"]');
         if (first) first.click();
