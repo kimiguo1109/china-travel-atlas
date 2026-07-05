@@ -33,6 +33,24 @@
   .atlas-title{font-family:var(--serif);font-size:26px;font-weight:700;letter-spacing:.14em;margin:0;line-height:1.25;text-wrap:balance;}
   .atlas-sub{font-size:11px;color:var(--paper-dim);margin:6px 0 0;letter-spacing:.04em;}
   .atlas-rule{height:1px;background:linear-gradient(90deg,var(--gold-soft),transparent);border:0;margin:14px 0 8px;}
+  .search-box{
+    width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px 12px;
+    background:rgba(10,15,29,.6);border:1px solid var(--hairline);border-radius:3px;
+    color:var(--paper);font-family:var(--sans);font-size:12.5px;letter-spacing:.04em;
+    outline:none;transition:border-color .15s;
+  }
+  .search-box::placeholder{color:var(--paper-dim);opacity:.7;}
+  .search-box:focus{border-color:var(--gold);}
+  .search-results{list-style:none;margin:0 0 6px;padding:0;}
+  .search-results li{
+    display:flex;align-items:baseline;gap:8px;padding:7px 8px;border-radius:3px;
+    cursor:pointer;font-size:13px;transition:background .15s;
+  }
+  .search-results li:hover,.search-results li:focus-visible{background:rgba(212,169,74,.12);outline:none;}
+  .search-results .sr-name{font-family:var(--serif);letter-spacing:.06em;}
+  .search-results .sr-meta{margin-left:auto;font-size:10px;color:var(--paper-dim);font-family:var(--mono);letter-spacing:.08em;}
+  .search-results .sr-none{cursor:default;color:var(--paper-dim);font-size:11px;}
+  .search-results .sr-none:hover{background:none;}
   .stops{list-style:none;margin:0;padding:0;max-height:46vh;overflow-y:auto;scrollbar-width:thin;}
   .stops li{display:flex;align-items:baseline;gap:10px;padding:7px 6px;border-radius:3px;cursor:pointer;transition:background .15s;}
   .stops li.region-head{
@@ -222,6 +240,8 @@
   <h1 class="atlas-title">山河游历图</h1>
   <p class="atlas-sub">走遍全国 34 个省份 · 一图山河</p>
   <hr class="atlas-rule">
+  <input class="search-box" id="searchBox" type="search" placeholder="搜索省份 / 城市 / 景点…" autocomplete="off">
+  <ul class="search-results" id="searchResults"></ul>
   <ul class="stops" id="stops"></ul>
   <button class="overview-btn" id="overviewBtn" type="button">回到全景 · OVERVIEW</button>
   <p class="atlas-foot" id="footStats"></p>
@@ -2094,6 +2114,71 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
     }, 'image/png');
   });
+
+  /* 🔍 搜索：省份 / 城市 / 景点直达 */
+  (function () {
+    var box = document.getElementById('searchBox');
+    var resUl = document.getElementById('searchResults');
+    /* 统一索引：省 + 城市 + 景点（含英文名，支持英文子串） */
+    var INDEX = [];
+    CHINA_GEO.provinces.forEach(function (p) {
+      INDEX.push({ label: p.name, meta: '省份', keys: (p.name + ' ' + (EN_OF[p.name] || '')).toLowerCase(), prov: p.name });
+    });
+    UNITS.forEach(function (u, i) {
+      INDEX.push({
+        label: u.city || u.spot,
+        meta: (u.type === 'city' ? '城市 · ' : '景点 · ') + u.p,
+        keys: ((u.city || u.spot) + ' ' + (u.cityEn || u.spotEn || '') + ' ' + u.p).toLowerCase(),
+        unit: i
+      });
+    });
+    var debounce = null;
+    function clearResults() { resUl.innerHTML = ''; }
+    function go(item) {
+      box.value = '';
+      clearResults();
+      if (item.prov) { enterProvince(item.prov); return; }
+      stopTour();
+      spotlightIdx = item.unit;
+      setMarkersForMode();
+      openSpotCard(item.unit, true);
+      lastActive = performance.now();
+    }
+    box.addEventListener('input', function () {
+      clearTimeout(debounce);
+      debounce = setTimeout(function () {
+        var q = box.value.trim().toLowerCase();
+        clearResults();
+        if (!q) return;
+        var hits = INDEX.filter(function (it) { return it.keys.indexOf(q) >= 0; }).slice(0, 8);
+        if (!hits.length) {
+          var none = document.createElement('li');
+          none.className = 'sr-none';
+          none.textContent = '没有找到「' + box.value.trim() + '」';
+          resUl.appendChild(none);
+          return;
+        }
+        hits.forEach(function (it) {
+          var li = document.createElement('li');
+          li.tabIndex = 0;
+          li.setAttribute('role', 'button');
+          var nm = document.createElement('span'); nm.className = 'sr-name'; nm.textContent = it.label;
+          var mt = document.createElement('span'); mt.className = 'sr-meta'; mt.textContent = it.meta;
+          li.appendChild(nm); li.appendChild(mt);
+          li.addEventListener('click', function () { go(it); });
+          li.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(it); } });
+          resUl.appendChild(li);
+        });
+      }, 140);
+    });
+    box.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { box.value = ''; clearResults(); box.blur(); e.stopPropagation(); }
+      if (e.key === 'Enter') {
+        var first = resUl.querySelector('li[role="button"]');
+        if (first) first.click();
+      }
+    });
+  })();
 
   /* 初始化：足迹点亮 + 行程还原 */
   refreshFootprint();
