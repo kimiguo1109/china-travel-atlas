@@ -266,6 +266,10 @@
   <div class="trip-btns" style="margin-top:10px;">
     <button id="luckyBtn" type="button">🎲 下一站去哪</button>
   </div>
+  <div class="trip-btns" style="margin-top:6px;">
+    <button id="backupBtn" type="button">备份足迹</button>
+    <button id="restoreBtn" type="button">恢复足迹</button>
+  </div>
 </div>
 <button class="trip-toggle" id="tripToggle" type="button">行程<b id="tripCount">0</b></button>
 
@@ -2209,6 +2213,44 @@ var SPOT_MEDIA = {"故宫": {"img": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA
       }
     });
   })();
+
+  /* 💾 足迹备份/恢复：base64 文本码，跨设备迁移打卡与行程 */
+  var backupBtn = document.getElementById('backupBtn');
+  var restoreBtn = document.getElementById('restoreBtn');
+  function flashBtn(btn, text, normal) {
+    btn.textContent = text;
+    setTimeout(function () { btn.textContent = normal; }, 1900);
+  }
+  backupBtn.addEventListener('click', function () {
+    var code = btoa(unescape(encodeURIComponent(JSON.stringify({ c: Array.from(checkins), r: route }))));
+    function fallback() { window.prompt('复制这段足迹码，换设备后用「恢复足迹」粘贴：', code); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(
+        function () { flashBtn(backupBtn, '✓ 足迹码已复制', '备份足迹'); },
+        function () { fallback(); flashBtn(backupBtn, '✓ 已生成', '备份足迹'); }
+      );
+    } else { fallback(); flashBtn(backupBtn, '✓ 已生成', '备份足迹'); }
+  });
+  restoreBtn.addEventListener('click', function () {
+    var code = window.prompt('粘贴足迹码：');
+    if (!code) return;
+    try {
+      var data = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+      (data.c || []).forEach(function (k) { if (k in unitByKey) checkins.add(k); });
+      var merged = route.slice();
+      (data.r || []).forEach(function (k) { if (k in unitByKey && merged.indexOf(k) < 0) merged.push(k); });
+      route = merged;
+      store.save('atlas_checkins', Array.from(checkins));
+      checkins.forEach(function (k) { badges[unitByKey[k]].visible = true; });
+      refreshFootprint();
+      visitedProv.forEach(function (p) { if (p !== currentProv && p !== hoverProv) setProvinceGlow(p, false); });
+      commitRoute();
+      refreshCardActions();
+      flashBtn(restoreBtn, '✓ 已恢复合并', '恢复足迹');
+    } catch (e) {
+      flashBtn(restoreBtn, '足迹码无效', '恢复足迹');
+    }
+  });
 
   /* 初始化：足迹点亮 + 行程还原 */
   refreshFootprint();
